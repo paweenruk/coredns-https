@@ -1,8 +1,10 @@
 package https
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 
@@ -10,6 +12,8 @@ import (
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
 	pkgtls "github.com/coredns/coredns/plugin/pkg/tls"
+	"github.com/quic-go/quic-go"
+	"github.com/quic-go/quic-go/http3"
 )
 
 const maxUpstreams = 15
@@ -33,12 +37,32 @@ func setup(c *caddy.Controller) error {
 }
 
 func setupDNSClient(conf *httpsConfig) dnsClient {
-	httpClient := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig:   conf.tlsConfig,
-			ForceAttemptHTTP2: true,
-			DisableKeepAlives: false,
-		},
+	var httpClient *http.Client
+
+	if conf.httpVersion == "HTTP3.0" {
+		tr := quic.Transport{}
+		h3tr := &http3.Transport{
+			TLSClientConfig: conf.tlsConfig,
+			QUICConfig:      &quic.Config{},
+			Dial: func(ctx context.Context, addr string, tlsConf *tls.Config, quicConf *quic.Config) (quic.EarlyConnection, error) {
+				a, err := net.ResolveUDPAddr("udp", addr)
+				if err != nil {
+					return nil, err
+				}
+				return tr.DialEarly(ctx, a, tlsConf, quicConf)
+			},
+		}
+		httpClient = &http.Client{
+			Transport: h3tr,
+		}
+	} else {
+		httpClient = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig:   conf.tlsConfig,
+				ForceAttemptHTTP2: true,
+				DisableKeepAlives: false,
+			},
+		}
 	}
 
 	clients := make([]dnsClient, len(conf.toURLs))
@@ -62,10 +86,13 @@ type httpsConfig struct {
 	tlsConfig     *tls.Config
 	tlsServerName string
 	policy        policy
+	httpVersion   string // Add httpVersion field
 }
 
 func parseConfig(c *caddy.Controller) (*httpsConfig, error) {
-	conf := &httpsConfig{}
+	conf := &httpsConfig{
+		httpVersion: "HTTP2.0", // Default to HTTP2.0
+	}
 	if !c.Next() || !c.Args(&conf.from) {
 		return conf, c.ArgErr()
 	}
@@ -127,6 +154,7 @@ var parseBlockMap = map[string]parseBlockFunc{
 	"tls":            parseTLS,
 	"tls_servername": parseTLSServerName,
 	"policy":         parsePolicy,
+	"http_version":   parseHTTPVersion, // Add http_version to parseBlockMap
 }
 
 func parseExcept(c *caddy.Controller, conf *httpsConfig) error {
@@ -184,6 +212,20 @@ func parsePolicy(c *caddy.Controller, conf *httpsConfig) error {
 		conf.policy = newSequentialPolicy()
 	default:
 		return c.Errf("unknown policy '%s'", args[0])
+	}
+	return nil
+}
+
+func parseHTTPVersion(c *caddy.Controller, conf *httpsConfig) error {
+	args := c.RemainingArgs()
+	if len(args) != 1 {
+		return c.ArgErr()
+	}
+	switch args[0] {
+	case "HTTP2.0", "HTTP3.0":
+		conf.httpVersion = args[0]
+	default:
+		return c.Errf("unsupported HTTP version '%s'", args[0])
 	}
 	return nil
 }
