@@ -62,7 +62,7 @@ func (c *dohDNSClient) Query(ctx context.Context, dnsreq []byte) (r *dns.Msg, er
 	if resp, err = c.client.Do(req); err != nil {
 		return
 	}
-	defer resp.Body.Close()
+	defer dumpRemainingResponse(resp)
 
 	// RFC8484 Section 4.2.1:
 	// A successful HTTP response with a 2xx status code is used for any valid DNS response,
@@ -85,6 +85,13 @@ func (c *dohDNSClient) Query(ctx context.Context, dnsreq []byte) (r *dns.Msg, er
 	r = new(dns.Msg)
 	err = r.Unpack(body)
 	return
+}
+
+func dumpRemainingResponse(res *http.Response) {
+	if res != nil {
+		_, _ = io.Copy(io.Discard, res.Body)
+		res.Body.Close()
+	}
 }
 
 type metricDNSClient struct {
