@@ -45,7 +45,7 @@ var _ plugin.Handler = (*HTTPS)(nil)
 func (*HTTPS) Name() string { return "https" }
 
 // ServeDNS implements plugin.Handler.
-func (h *HTTPS) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (status int, err error) {
+func (h *HTTPS) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
 	state := request.Request{W: w, Req: r}
 	if !h.match(state) {
 		return plugin.NextOrFailure(h.Name(), h.Next, ctx, w, r)
@@ -60,28 +60,22 @@ func (h *HTTPS) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) 
 		return dns.RcodeServerFailure, err
 	}
 
-	// Check if the reply is correct; if not return FormErr.
-	// maybe useful to extract this logic from forward, grpc and https plugins to common place
 	if !state.Match(result) {
 		debug.Hexdumpf(result, "Wrong reply for id: %d, %s %d", result.Id, state.QName(), state.QType())
-
-		formerr := new(dns.Msg)
-		formerr.SetRcode(state.Req, dns.RcodeFormatError)
-		err = w.WriteMsg(formerr)
-		return
+		return h.writeFormErr(w, state)
 	}
-
-	err = w.WriteMsg(result)
-	return
+	return dns.RcodeSuccess, w.WriteMsg(result)
 }
 
-// TODO extract this logic from forward, grpc and https plugins to common place
-func (h *HTTPS) match(state request.Request) bool {
-	if !plugin.Name(h.from).Matches(state.Name()) || !h.isAllowedDomain(state.Name()) {
-		return false
-	}
+func (h *HTTPS) writeFormErr(w dns.ResponseWriter, state request.Request) (int, error) {
+	formerr := new(dns.Msg)
+	formerr.SetRcode(state.Req, dns.RcodeFormatError)
+	err := w.WriteMsg(formerr)
+	return dns.RcodeFormatError, err
+}
 
-	return true
+func (h *HTTPS) match(state request.Request) bool {
+	return plugin.Name(h.from).Matches(state.Name()) && h.isAllowedDomain(state.Name())
 }
 
 func (h *HTTPS) isAllowedDomain(name string) bool {
