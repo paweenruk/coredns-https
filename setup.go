@@ -33,12 +33,12 @@ func setup(c *caddy.Controller) error {
 }
 
 func setupDNSClient(conf *httpsConfig) dnsClient {
-	tr := &http.Transport{
-		TLSClientConfig:   conf.tlsConfig,
-		ForceAttemptHTTP2: true,
-	}
 	httpClient := &http.Client{
-		Transport: tr,
+		Transport: &http.Transport{
+			TLSClientConfig:   conf.tlsConfig,
+			ForceAttemptHTTP2: true,
+			DisableKeepAlives: false,
+		},
 	}
 
 	clients := make([]dnsClient, len(conf.toURLs))
@@ -64,33 +64,25 @@ type httpsConfig struct {
 	policy        policy
 }
 
-func parseConfig(c *caddy.Controller) (conf *httpsConfig, err error) {
-	conf = &httpsConfig{}
-	if !c.Next() {
+func parseConfig(c *caddy.Controller) (*httpsConfig, error) {
+	conf := &httpsConfig{}
+	if !c.Next() || !c.Args(&conf.from) {
 		return conf, c.ArgErr()
 	}
-	if !c.Args(&conf.from) {
-		return conf, c.ArgErr()
-	}
-	conf.from, err = parseHost(conf.from)
-	if err != nil {
+
+	var err error
+	if conf.from, err = parseHost(conf.from); err != nil {
 		return conf, err
 	}
 
 	toURLs := c.RemainingArgs()
-	if len(toURLs) == 0 {
-		return conf, c.ArgErr()
+	if len(toURLs) == 0 || len(toURLs) > maxUpstreams {
+		return conf, fmt.Errorf("invalid number of TOs configured: %d", len(toURLs))
 	}
-	if len(toURLs) > maxUpstreams {
-		return conf, fmt.Errorf("more than %d TOs configured: %d", maxUpstreams, len(toURLs))
-	}
-	conf.toURLs = make([]string, 0, len(toURLs))
-	for _, to := range toURLs {
-		toURL := "https://" + to
-		if _, err := url.ParseRequestURI(toURL); err != nil {
-			return conf, err
-		}
-		conf.toURLs = append(conf.toURLs, toURL)
+
+	conf.toURLs, err = parseToURLs(toURLs)
+	if err != nil {
+		return conf, err
 	}
 
 	for c.NextBlock() {
@@ -109,12 +101,23 @@ func parseConfig(c *caddy.Controller) (conf *httpsConfig, err error) {
 	return conf, nil
 }
 
-func parseBlock(c *caddy.Controller, conf *httpsConfig) (err error) {
-	f, ok := parseBlockMap[c.Val()]
-	if !ok {
-		return c.Errf("unknown property '%s'", c.Val())
+func parseToURLs(toURLs []string) ([]string, error) {
+	parsedURLs := make([]string, 0, len(toURLs))
+	for _, to := range toURLs {
+		toURL := "https://" + to
+		if _, err := url.ParseRequestURI(toURL); err != nil {
+			return nil, err
+		}
+		parsedURLs = append(parsedURLs, toURL)
 	}
-	return f(c, conf)
+	return parsedURLs, nil
+}
+
+func parseBlock(c *caddy.Controller, conf *httpsConfig) error {
+	if f, ok := parseBlockMap[c.Val()]; ok {
+		return f(c, conf)
+	}
+	return c.Errf("unknown property '%s'", c.Val())
 }
 
 type parseBlockFunc func(*caddy.Controller, *httpsConfig) error
@@ -126,18 +129,19 @@ var parseBlockMap = map[string]parseBlockFunc{
 	"policy":         parsePolicy,
 }
 
-func parseExcept(c *caddy.Controller, conf *httpsConfig) (err error) {
+func parseExcept(c *caddy.Controller, conf *httpsConfig) error {
 	except := c.RemainingArgs()
 	if len(except) == 0 {
 		return c.ArgErr()
 	}
-	for i := 0; i < len(except); i++ {
+	for i := range except {
+		var err error
 		if except[i], err = parseHost(except[i]); err != nil {
-			return
+			return err
 		}
 	}
 	conf.except = except
-	return
+	return nil
 }
 
 func parseHost(hostAddr string) (string, error) {
@@ -149,8 +153,7 @@ func parseHost(hostAddr string) (string, error) {
 }
 
 func parseTLS(c *caddy.Controller, conf *httpsConfig) error {
-	args := c.RemainingArgs()
-	tlsConfig, err := pkgtls.NewTLSConfigFromArgs(args...)
+	tlsConfig, err := pkgtls.NewTLSConfigFromArgs(c.RemainingArgs()...)
 	if err != nil {
 		return err
 	}
