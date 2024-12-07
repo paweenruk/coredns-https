@@ -1,12 +1,11 @@
 package https
 
 import (
-	"context"
 	"crypto/tls"
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
@@ -38,29 +37,26 @@ func setup(c *caddy.Controller) error {
 
 func setupDNSClient(conf *httpsConfig) dnsClient {
 	var httpClient *http.Client
-
 	if conf.httpVersion == "HTTP3.0" {
-		tr := quic.Transport{}
-		h3tr := &http3.Transport{
-			TLSClientConfig: conf.tlsConfig,
-			QUICConfig:      &quic.Config{},
-			Dial: func(ctx context.Context, addr string, tlsConf *tls.Config, quicConf *quic.Config) (quic.EarlyConnection, error) {
-				a, err := net.ResolveUDPAddr("udp", addr)
-				if err != nil {
-					return nil, err
-				}
-				return tr.DialEarly(ctx, a, tlsConf, quicConf)
-			},
-		}
 		httpClient = &http.Client{
-			Transport: h3tr,
+			Transport: &http3.Transport{
+				TLSClientConfig: &tls.Config{},
+				QUICConfig: &quic.Config{
+					Allow0RTT:       true,
+					KeepAlivePeriod: time.Second * 600,
+				},
+			},
 		}
 	} else {
 		httpClient = &http.Client{
 			Transport: &http.Transport{
-				TLSClientConfig:   conf.tlsConfig,
-				ForceAttemptHTTP2: true,
-				DisableKeepAlives: false,
+				TLSClientConfig:     conf.tlsConfig,
+				ForceAttemptHTTP2:   true,
+				DisableKeepAlives:   false,
+				MaxConnsPerHost:     100,
+				MaxIdleConnsPerHost: 100,
+				MaxIdleConns:        100,
+				IdleConnTimeout:     600 * time.Second,
 			},
 		}
 	}
