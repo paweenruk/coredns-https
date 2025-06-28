@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
 	pkgtls "github.com/coredns/coredns/plugin/pkg/tls"
+	"github.com/quic-go/quic-go"
+	"github.com/quic-go/quic-go/http3"
 )
 
 const maxUpstreams = 15
@@ -33,12 +36,29 @@ func setup(c *caddy.Controller) error {
 }
 
 func setupDNSClient(conf *httpsConfig) dnsClient {
-	httpClient := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig:   conf.tlsConfig,
-			ForceAttemptHTTP2: true,
-			DisableKeepAlives: false,
-		},
+	var httpClient *http.Client
+	if conf.httpVersion == "HTTP3.0" {
+		httpClient = &http.Client{
+			Transport: &http3.Transport{
+				TLSClientConfig: &tls.Config{},
+				QUICConfig: &quic.Config{
+					Allow0RTT:       true,
+					KeepAlivePeriod: time.Second * 600,
+				},
+			},
+		}
+	} else {
+		httpClient = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig:     conf.tlsConfig,
+				ForceAttemptHTTP2:   true,
+				DisableKeepAlives:   false,
+				MaxConnsPerHost:     100,
+				MaxIdleConnsPerHost: 100,
+				MaxIdleConns:        100,
+				IdleConnTimeout:     600 * time.Second,
+			},
+		}
 	}
 
 	clients := make([]dnsClient, len(conf.toURLs))
@@ -62,10 +82,13 @@ type httpsConfig struct {
 	tlsConfig     *tls.Config
 	tlsServerName string
 	policy        policy
+	httpVersion   string // Add httpVersion field
 }
 
 func parseConfig(c *caddy.Controller) (*httpsConfig, error) {
-	conf := &httpsConfig{}
+	conf := &httpsConfig{
+		httpVersion: "HTTP2.0", // Default to HTTP2.0
+	}
 	if !c.Next() || !c.Args(&conf.from) {
 		return conf, c.ArgErr()
 	}
@@ -127,6 +150,7 @@ var parseBlockMap = map[string]parseBlockFunc{
 	"tls":            parseTLS,
 	"tls_servername": parseTLSServerName,
 	"policy":         parsePolicy,
+	"http_version":   parseHTTPVersion, // Add http_version to parseBlockMap
 }
 
 func parseExcept(c *caddy.Controller, conf *httpsConfig) error {
@@ -184,6 +208,20 @@ func parsePolicy(c *caddy.Controller, conf *httpsConfig) error {
 		conf.policy = newSequentialPolicy()
 	default:
 		return c.Errf("unknown policy '%s'", args[0])
+	}
+	return nil
+}
+
+func parseHTTPVersion(c *caddy.Controller, conf *httpsConfig) error {
+	args := c.RemainingArgs()
+	if len(args) != 1 {
+		return c.ArgErr()
+	}
+	switch args[0] {
+	case "HTTP2.0", "HTTP3.0":
+		conf.httpVersion = args[0]
+	default:
+		return c.Errf("unsupported HTTP version '%s'", args[0])
 	}
 	return nil
 }

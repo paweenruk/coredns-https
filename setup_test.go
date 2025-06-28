@@ -19,43 +19,48 @@ func TestParseConfig(t *testing.T) {
 			name:  "FromAndOneToURL",
 			input: "https . example.com/dns-query",
 			expectedConfig: &httpsConfig{
-				from:   ".",
-				toURLs: []string{"https://example.com/dns-query"},
+				from:        ".",
+				toURLs:      []string{"https://example.com/dns-query"},
+				httpVersion: "HTTP2.0", // Add default httpVersion
 			},
 		},
 		{
 			name:  "FromAndTwoToURLs",
 			input: "https . example.com/dns-query example.org/dns-query",
 			expectedConfig: &httpsConfig{
-				from:   ".",
-				toURLs: []string{"https://example.com/dns-query", "https://example.org/dns-query"},
+				from:        ".",
+				toURLs:      []string{"https://example.com/dns-query", "https://example.org/dns-query"},
+				httpVersion: "HTTP2.0", // Add default httpVersion
 			},
 		},
 		{
 			name:  "ExceptProperty",
 			input: "https . example.com/dns-query {\nexcept domain.com\n}\n",
 			expectedConfig: &httpsConfig{
-				from:   ".",
-				toURLs: []string{"https://example.com/dns-query"},
-				except: []string{"domain.com."},
+				from:        ".",
+				toURLs:      []string{"https://example.com/dns-query"},
+				except:      []string{"domain.com."},
+				httpVersion: "HTTP2.0", // Add default httpVersion
 			},
 		},
 		{
 			name:  "ExceptPropertyURL",
 			input: "https . example.com/dns-query {\nexcept https://domain.com\n}\n",
 			expectedConfig: &httpsConfig{
-				from:   ".",
-				toURLs: []string{"https://example.com/dns-query"},
-				except: []string{"domain.com."},
+				from:        ".",
+				toURLs:      []string{"https://example.com/dns-query"},
+				except:      []string{"domain.com."},
+				httpVersion: "HTTP2.0", // Add default httpVersion
 			},
 		},
 		{
 			name:  "ExceptPropertyTwoDomains",
 			input: "https . example.com/dns-query {\nexcept domain1.com domain2.com\n}\n",
 			expectedConfig: &httpsConfig{
-				from:   ".",
-				toURLs: []string{"https://example.com/dns-query"},
-				except: []string{"domain1.com.", "domain2.com."},
+				from:        ".",
+				toURLs:      []string{"https://example.com/dns-query"},
+				except:      []string{"domain1.com.", "domain2.com."},
+				httpVersion: "HTTP2.0", // Add default httpVersion
 			},
 		},
 		{
@@ -66,33 +71,46 @@ func TestParseConfig(t *testing.T) {
 				toURLs:        []string{"https://10.1.1.1:853/dns-query"},
 				tlsConfig:     &tls.Config{ServerName: "internal.domain"},
 				tlsServerName: "internal.domain",
+				httpVersion:   "HTTP2.0", // Add default httpVersion
 			},
 		},
 		{
 			name:  "PolicyPropertyRandom",
 			input: "https . example.com/dns-query {\npolicy random\n}\n",
 			expectedConfig: &httpsConfig{
-				from:   ".",
-				toURLs: []string{"https://example.com/dns-query"},
-				policy: newRandomPolicy(),
+				from:        ".",
+				toURLs:      []string{"https://example.com/dns-query"},
+				policy:      newRandomPolicy(),
+				httpVersion: "HTTP2.0", // Add default httpVersion
 			},
 		},
 		{
 			name:  "PolicyPropertyRoundRobin",
 			input: "https . example.com/dns-query {\npolicy round_robin\n}\n",
 			expectedConfig: &httpsConfig{
-				from:   ".",
-				toURLs: []string{"https://example.com/dns-query"},
-				policy: newRoundRobinPolicy(),
+				from:        ".",
+				toURLs:      []string{"https://example.com/dns-query"},
+				policy:      newRoundRobinPolicy(),
+				httpVersion: "HTTP2.0", // Add default httpVersion
 			},
 		},
 		{
 			name:  "PolicyPropertySequential",
 			input: "https . example.com/dns-query {\npolicy sequential\n}\n",
 			expectedConfig: &httpsConfig{
-				from:   ".",
-				toURLs: []string{"https://example.com/dns-query"},
-				policy: newSequentialPolicy(),
+				from:        ".",
+				toURLs:      []string{"https://example.com/dns-query"},
+				policy:      newSequentialPolicy(),
+				httpVersion: "HTTP2.0", // Add default httpVersion
+			},
+		},
+		{
+			name:  "HTTPVersionProperty",
+			input: "https . example.com/dns-query {\nhttp_version HTTP3.0\n}\n",
+			expectedConfig: &httpsConfig{
+				from:        ".",
+				toURLs:      []string{"https://example.com/dns-query"},
+				httpVersion: "HTTP3.0",
 			},
 		},
 	}
