@@ -1,6 +1,6 @@
 module github.com/v-byte-cpu/coredns-https
 
-go 1.22.7
+go 1.23.0
 
 toolchain go1.23.4
 
@@ -20,9 +20,9 @@ require (
 	github.com/onsi/ginkgo/v2 v2.19.0 // indirect
 	github.com/quic-go/qpack v0.5.1 // indirect
 	go.uber.org/mock v0.4.0 // indirect
-	golang.org/x/crypto v0.29.0 // indirect
+	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842 // indirect
-	golang.org/x/sync v0.9.0 // indirect
+	golang.org/x/sync v0.11.0 // indirect
 )
 
 require (
@@ -42,8 +42,8 @@ require (
 	github.com/quic-go/quic-go v0.48.2
 	golang.org/x/mod v0.18.0 // indirect
 	golang.org/x/net v0.31.0 // indirect
-	golang.org/x/sys v0.27.0 // indirect
-	golang.org/x/text v0.20.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/text v0.22.0 // indirect
 	golang.org/x/tools v0.22.0 // indirect
 	google.golang.org/genproto v0.0.0-20220519153652-3a47de7e79bd // indirect
 	google.golang.org/grpc v1.68.0 // indirect
