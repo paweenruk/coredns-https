@@ -1,4 +1,4 @@
-module github.com/v-byte-cpu/coredns-https
+module github.com/paweenruk/coredns-https
 
 go 1.22.7
 
