@@ -20,8 +20,8 @@ require (
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.35.0 // indirect
 	go.uber.org/mock v0.5.0 // indirect
-	golang.org/x/crypto v0.39.0 // indirect
-	golang.org/x/sync v0.15.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
+	golang.org/x/sync v0.18.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250512202823-5a2f75b736a9 // indirect
 )
 
@@ -40,11 +40,11 @@ require (
 	github.com/prometheus/common v0.64.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/quic-go/quic-go v0.52.0
-	golang.org/x/mod v0.25.0 // indirect
-	golang.org/x/net v0.41.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/text v0.26.0 // indirect
-	golang.org/x/tools v0.33.0 // indirect
+	golang.org/x/mod v0.29.0 // indirect
+	golang.org/x/net v0.47.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
+	golang.org/x/text v0.31.0 // indirect
+	golang.org/x/tools v0.38.0 // indirect
 	google.golang.org/grpc v1.72.2 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
